@@ -819,6 +819,242 @@ app.post('/api/habits/apply', async (c) => {
   }
 })
 
+// ============== TEAM MANAGEMENT API ENDPOINTS ==============
+
+// Get accessible employees for current user
+app.get('/api/team/employees', async (c) => {
+  try {
+    const user = await getCurrentUser(c)
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    const employees = await getAccessibleEmployees(c, user)
+    return c.json({ employees: employees.results })
+  } catch (error) {
+    console.error('Team employees API error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Get team schedules with filters
+app.post('/api/team/schedules', async (c) => {
+  try {
+    const user = await getCurrentUser(c)
+    if (!user) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    const { startDate, endDate, employeeIds, departments, locations, statuses } = await c.req.json()
+    
+    // Get accessible employees
+    const accessibleEmployees = await getAccessibleEmployees(c, user)
+    const accessibleIds = accessibleEmployees.results?.map((emp: any) => emp.id) || []
+    
+    // Filter employee IDs based on access
+    let filterIds = accessibleIds
+    if (employeeIds && employeeIds.length > 0) {
+      filterIds = accessibleIds.filter((id: number) => employeeIds.includes(id))
+    }
+    
+    if (filterIds.length === 0) {
+      return c.json({ schedules: [] })
+    }
+    
+    // Build query
+    let query = `
+      SELECT s.*, u.display_name, u.email, u.department, u.site 
+      FROM schedules s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.user_id IN (${filterIds.map(() => '?').join(',')})
+      AND s.date >= ? AND s.date <= ?
+    `
+    let params = [...filterIds, startDate, endDate]
+    
+    // Add additional filters
+    if (departments && departments.length > 0) {
+      query += ` AND u.department IN (${departments.map(() => '?').join(',')})`
+      params.push(...departments)
+    }
+    
+    if (locations && locations.length > 0) {
+      query += ` AND u.site IN (${locations.map(() => '?').join(',')})`
+      params.push(...locations)
+    }
+    
+    if (statuses && statuses.length > 0) {
+      query += ` AND s.status IN (${statuses.map(() => '?').join(',')})`
+      params.push(...statuses)
+    }
+    
+    query += ` ORDER BY u.display_name, s.date, s.time_period`
+    
+    const schedules = await c.env.DB.prepare(query).bind(...params).all()
+    return c.json({ schedules: schedules.results })
+  } catch (error) {
+    console.error('Team schedules API error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Override employee schedule (manager/admin only)
+app.post('/api/team/override-schedule', async (c) => {
+  try {
+    const user = await getCurrentUser(c)
+    if (!user || user.admin_access < 1) {
+      return c.json({ error: 'Insufficient permissions' }, 403)
+    }
+
+    const { userId, date, timePeriod, status, reason } = await c.req.json()
+    
+    if (!userId || !date || !timePeriod || !status) {
+      return c.json({ error: 'Missing required fields' }, 400)
+    }
+
+    // Verify access to this employee
+    const accessibleEmployees = await getAccessibleEmployees(c, user)
+    const accessibleIds = accessibleEmployees.results?.map((emp: any) => emp.id) || []
+    
+    if (!accessibleIds.includes(userId)) {
+      return c.json({ error: 'Access denied to this employee' }, 403)
+    }
+
+    // Insert or update schedule with override
+    await c.env.DB.prepare(`
+      INSERT OR REPLACE INTO schedules (user_id, date, time_period, status, notes, updated_at)
+      VALUES (?, ?, ?, ?, ?, datetime('now'))
+    `).bind(userId, date, timePeriod, status, `Manager override: ${reason || 'No reason provided'}`).run()
+
+    // Log the override in audit trail
+    await c.env.DB.prepare(`
+      INSERT INTO audit_log (user_id, action, table_name, record_id, new_values)
+      VALUES (?, 'OVERRIDE', 'schedules', ?, ?)
+    `).bind(user.id, userId, JSON.stringify({ 
+      overridden_user_id: userId, 
+      date, 
+      timePeriod, 
+      status, 
+      reason,
+      overridden_by: user.display_name
+    })).run()
+
+    return c.json({ 
+      success: true, 
+      message: 'Schedule overridden successfully'
+    })
+  } catch (error) {
+    console.error('Schedule override error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Bulk edit schedules (manager/admin only)
+app.post('/api/team/bulk-edit', async (c) => {
+  try {
+    const user = await getCurrentUser(c)
+    if (!user || user.admin_access < 1) {
+      return c.json({ error: 'Insufficient permissions' }, 403)
+    }
+
+    const { operations } = await c.req.json()
+    
+    if (!operations || !Array.isArray(operations)) {
+      return c.json({ error: 'Invalid operations array' }, 400)
+    }
+
+    // Verify access to all employees in operations
+    const accessibleEmployees = await getAccessibleEmployees(c, user)
+    const accessibleIds = accessibleEmployees.results?.map((emp: any) => emp.id) || []
+    
+    let successCount = 0
+    const errors = []
+
+    for (const op of operations) {
+      try {
+        const { userId, date, timePeriod, status, reason } = op
+        
+        if (!accessibleIds.includes(userId)) {
+          errors.push(`Access denied to employee ID ${userId}`)
+          continue
+        }
+
+        await c.env.DB.prepare(`
+          INSERT OR REPLACE INTO schedules (user_id, date, time_period, status, notes, updated_at)
+          VALUES (?, ?, ?, ?, ?, datetime('now'))
+        `).bind(userId, date, timePeriod, status, `Bulk edit: ${reason || 'Manager bulk update'}`).run()
+
+        successCount++
+      } catch (error) {
+        errors.push(`Failed to update ${op.userId}: ${error}`)
+      }
+    }
+
+    return c.json({ 
+      success: true, 
+      message: `Bulk edit completed: ${successCount} updates, ${errors.length} errors`,
+      successCount,
+      errors
+    })
+  } catch (error) {
+    console.error('Bulk edit error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
+// Export team schedules (manager/admin only)
+app.get('/api/team/export', async (c) => {
+  try {
+    const user = await getCurrentUser(c)
+    if (!user || user.admin_access < 1) {
+      return c.json({ error: 'Insufficient permissions' }, 403)
+    }
+
+    const startDate = c.req.query('startDate')
+    const endDate = c.req.query('endDate')
+    const format = c.req.query('format') || 'json'
+    
+    // Get accessible employees and their schedules
+    const accessibleEmployees = await getAccessibleEmployees(c, user)
+    const accessibleIds = accessibleEmployees.results?.map((emp: any) => emp.id) || []
+    
+    if (accessibleIds.length === 0) {
+      return c.json({ schedules: [] })
+    }
+
+    const schedules = await c.env.DB.prepare(`
+      SELECT 
+        s.date, s.time_period, s.status, s.notes,
+        u.display_name, u.email, u.department, u.site
+      FROM schedules s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.user_id IN (${accessibleIds.map(() => '?').join(',')})
+      ${startDate ? 'AND s.date >= ?' : ''}
+      ${endDate ? 'AND s.date <= ?' : ''}
+      ORDER BY u.display_name, s.date, s.time_period
+    `).bind(...accessibleIds, ...(startDate ? [startDate] : []), ...(endDate ? [endDate] : [])).all()
+
+    if (format === 'csv') {
+      const csvData = schedules.results?.map((row: any) => 
+        [row.display_name, row.email, row.department, row.site, row.date, row.time_period, row.status, row.notes || ''].join(',')
+      ).join('\n') || ''
+      
+      const csvHeader = 'Name,Email,Department,Site,Date,Period,Status,Notes\n'
+      
+      return new Response(csvHeader + csvData, {
+        headers: {
+          'Content-Type': 'text/csv',
+          'Content-Disposition': `attachment; filename="team-schedules-${startDate || 'all'}-${endDate || 'all'}.csv"`
+        }
+      })
+    }
+
+    return c.json({ schedules: schedules.results })
+  } catch (error) {
+    console.error('Export error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 // ============== PROTECTED PAGES ==============
 
 // Main dashboard page - requires authentication
@@ -1284,6 +1520,298 @@ app.get('/organization', requireAuth, async (c) => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  )
+})
+
+// ============== ROLE-BASED ACCESS CONTROL HELPERS ==============
+
+// Check if user has manager access to another user
+function hasManagerAccess(currentUser: User, targetUserId?: number): boolean {
+  // Admins have access to everyone
+  if (currentUser.admin_access >= 2) return true
+  
+  // Managers have access to their team members
+  if (currentUser.admin_access >= 1) return true
+  
+  // Regular employees only have access to themselves
+  return !targetUserId || currentUser.id === targetUserId
+}
+
+// Get user's accessible team members based on role
+async function getAccessibleEmployees(c: any, currentUser: User) {
+  let query = `
+    SELECT DISTINCT u.* FROM users u 
+    WHERE u.active = 1
+  `
+  let params: any[] = []
+  
+  if (currentUser.admin_access >= 2) {
+    // Admin: All employees
+    query += ` ORDER BY u.department, u.display_name`
+  } else if (currentUser.admin_access >= 1) {
+    // Manager: Their department + cross-team coordination
+    query += ` AND (u.department = ? OR u.manager_email = ?) ORDER BY u.department, u.display_name`
+    params = [currentUser.department, currentUser.email]
+  } else {
+    // Employee: Only themselves
+    query += ` AND u.id = ? ORDER BY u.display_name`
+    params = [currentUser.id]
+  }
+  
+  return await c.env.DB.prepare(query).bind(...params).all()
+}
+
+// ============== TEAM VIEW PAGE ==============
+
+// Team view page - requires authentication with role-based access
+app.get('/team', requireAuth, async (c) => {
+  const user = c.get('user') as User
+  
+  return c.render(
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation Sidebar */}
+      <div className="fixed inset-y-0 left-0 w-64 bg-white shadow-lg">
+        <div className="p-6">
+          <h1 className="text-xl font-bold text-gray-800">Work-from-Anywhere Planner</h1>
+          <div className="mt-2 text-sm text-gray-600">
+            Welcome, {user.display_name}
+          </div>
+          <div className="mt-1 text-xs text-blue-600 font-medium">
+            {user.admin_access >= 2 ? 'Admin Access' : user.admin_access >= 1 ? 'Manager Access' : 'Employee Access'}
+          </div>
+        </div>
+        <nav className="mt-6">
+          <a href="/" className="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-100">
+            <i className="fas fa-chart-bar mr-3"></i>
+            Analytics
+          </a>
+          <a href="/schedule" className="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-100">
+            <i className="fas fa-calendar mr-3"></i>
+            My Schedule
+          </a>
+          <a href="/team" className="flex items-center px-6 py-3 text-gray-700 bg-blue-50 border-r-2 border-blue-500">
+            <i className="fas fa-users mr-3"></i>
+            Team View
+          </a>
+          <a href="/organization" className="flex items-center px-6 py-3 text-gray-700 hover:bg-gray-100">
+            <i className="fas fa-building mr-3"></i>
+            Organization
+          </a>
+          <div className="mt-8 px-6">
+            <form action="/api/logout" method="POST">
+              <button type="submit" className="w-full flex items-center px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+                <i className="fas fa-sign-out-alt mr-3"></i>
+                Sign Out
+              </button>
+            </form>
+          </div>
+        </nav>
+      </div>
+
+      {/* Main Content */}
+      <div className="ml-64 p-8">
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Team Schedule Management</h2>
+          <p className="text-gray-600">
+            {user.admin_access >= 2 
+              ? 'Manage schedules for all employees across the organization'
+              : user.admin_access >= 1 
+                ? 'View and manage your team member schedules'
+                : 'View schedules for your immediate team'
+            }
+          </p>
+        </div>
+
+        {/* Date Range and View Controls */}
+        <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center space-x-4">
+              <h3 className="text-lg font-semibold text-gray-800">Schedule View</h3>
+              <div className="flex bg-gray-100 rounded-lg p-1">
+                <button id="weekly-view" className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 text-white">
+                  Weekly
+                </button>
+                <button id="monthly-view" className="px-4 py-2 text-sm font-medium rounded-md text-gray-600 hover:text-gray-800">
+                  Monthly
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <select id="date-range-preset" className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="today">Today</option>
+                <option value="this-week" selected>This Week</option>
+                <option value="this-month">This Month</option>
+                <option value="last-month">Last Month</option>
+                <option value="this-quarter">This Quarter</option>
+                <option value="last-quarter">Last Quarter</option>
+                <option value="custom">Custom Range</option>
+              </select>
+              
+              <div id="custom-date-inputs" className="hidden flex items-center space-x-2">
+                <input type="date" id="start-date" className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+                <span className="text-gray-500">to</span>
+                <input type="date" id="end-date" className="px-3 py-2 border border-gray-300 rounded-lg text-sm" />
+              </div>
+              
+              <button id="apply-date-range" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Advanced Filters */}
+        <div className="bg-white p-6 rounded-lg shadow-sm mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Filter Options</h3>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+              <select id="employee-filter" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Employees</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Team/Department</label>
+              <select id="department-filter" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Departments</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Office Location</label>
+              <select id="location-filter" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Locations</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Status Type</label>
+              <select id="status-filter" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Statuses</option>
+                <option value="WFH">Work from Home</option>
+                <option value="WFO">Work From Overseas</option>
+                <option value="IN_OFFICE">In Office</option>
+                <option value="TRIP">Business Trip</option>
+                <option value="LEAVE">Leave/Time Off</option>
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Actions</label>
+              <div className="flex space-x-2">
+                <button id="apply-filters" className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+                  Apply
+                </button>
+                <button id="clear-filters" className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 text-sm">
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Team Calendar View */}
+        <div className="bg-white rounded-lg shadow-sm">
+          {/* Calendar Header */}
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <button id="prev-period" className="p-2 rounded-lg hover:bg-gray-100">
+                  <i className="fas fa-chevron-left text-gray-600"></i>
+                </button>
+                <h3 id="period-title" className="text-lg font-semibold text-gray-800">
+                  Week of December 18, 2024
+                </h3>
+                <button id="next-period" className="p-2 rounded-lg hover:bg-gray-100">
+                  <i className="fas fa-chevron-right text-gray-600"></i>
+                </button>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {user.admin_access >= 1 && (
+                  <>
+                    <button id="bulk-edit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                      <i className="fas fa-edit mr-2"></i>
+                      Bulk Edit
+                    </button>
+                    <button id="export-schedules" className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 text-sm">
+                      <i className="fas fa-download mr-2"></i>
+                      Export
+                    </button>
+                  </>
+                )}
+                <button id="refresh-view" className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
+                  <i className="fas fa-sync-alt mr-2"></i>
+                  Refresh
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Calendar Grid */}
+          <div id="team-calendar" className="p-6">
+            <div className="text-center py-8 text-gray-500">
+              <i className="fas fa-spinner fa-spin text-2xl mb-2"></i>
+              <div>Loading team schedules...</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Schedule Override Modal (for managers) */}
+        {user.admin_access >= 1 && (
+          <div id="override-modal" className="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-semibold mb-4">Override Schedule</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Employee</label>
+                <select id="override-employee" className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                  <option value="">Select Employee</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                <input type="date" id="override-date" className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Period</label>
+                <select id="override-period" className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                  <option value="AM">Morning</option>
+                  <option value="PM">Afternoon</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">New Status</label>
+                <select id="override-status" className="w-full px-3 py-2 border border-gray-300 rounded-lg">
+                  <option value="WFH">Work from Home</option>
+                  <option value="WFO">Work From Overseas</option>
+                  <option value="IN_OFFICE">In Office</option>
+                  <option value="TRIP">Business Trip</option>
+                  <option value="LEAVE">Leave/Time Off</option>
+                </select>
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Override Reason</label>
+                <textarea id="override-reason" className="w-full px-3 py-2 border border-gray-300 rounded-lg" rows="3" placeholder="Reason for schedule override..."></textarea>
+              </div>
+              <div className="flex space-x-3">
+                <button id="confirm-override" className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                  Override Schedule
+                </button>
+                <button id="cancel-override" className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Hidden user info for JavaScript */}
+        <input type="hidden" id="current-user-id" value={user.id.toString()} />
+        <input type="hidden" id="user-access-level" value={user.admin_access.toString()} />
       </div>
     </div>
   )
