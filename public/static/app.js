@@ -22,15 +22,19 @@ function handleLogin(event) {
   const existingError = document.getElementById('error-message');
   if (existingError) existingError.remove();
   
-  // Create form data
-  const formData = new FormData();
-  formData.append('email', email);
-  formData.append('password', password);
+  // Create JSON payload (matching successful curl test)
+  const loginData = {
+    email: email,
+    password: password
+  };
   
-  // Submit login request
+  // Submit login request with JSON (matching successful curl test)
   fetch('/api/login', {
     method: 'POST',
-    body: formData,
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(loginData),
     credentials: 'same-origin'
   })
   .then(response => {
