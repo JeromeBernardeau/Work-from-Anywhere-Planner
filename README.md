@@ -7,7 +7,7 @@
 
 ## 🌍 Live URLs
 - **Production**: https://ficofi-work-planner.pages.dev
-- **Latest Deploy**: https://e3acc26f.ficofi-work-planner.pages.dev  
+- **Latest Deploy**: https://f08c6c18.ficofi-work-planner.pages.dev  
 - **Development**: https://3000-iw7u7b85utjisczxqrd30-6532622b.e2b.dev
 - **GitHub**: https://github.com/JeromeBernardeau/Work-from-Anywhere-Planner
 
@@ -43,7 +43,10 @@
 - **✅ FIXED: Login form handling** - Resolved Content-Type issues for seamless authentication
 
 ### 🎯 **Recent Fixes & Enhancements (Latest Update)**
-- **Set Habits Modal**: Complete implementation for recurring weekly schedule patterns
+- **✅ Set Habits Modal Improvements**: 
+  - Removed Saturday and Sunday columns (weekdays only: Mon-Fri)
+  - Set "In Office" as default selection for all time slots
+  - Streamlined weekly habit setting for business days focus
 - **Status Label Corrections**: WFO now correctly displays "Work From Overseas" 
 - **Dropdown Functionality**: All status options including "In Office" now work properly
 - **Authentication Improvements**: Fixed form submission and password validation issues
