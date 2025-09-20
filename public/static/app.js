@@ -1,5 +1,73 @@
 // FICOFI Work-from-Anywhere Planner Frontend JavaScript - Enhanced Schedule Management
 
+// ============== LOGIN HANDLER ==============
+
+// Handle login form submission with JavaScript to bypass browser form issues
+function handleLogin(event) {
+  event.preventDefault();
+  
+  const form = event.target;
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  const button = document.getElementById('loginButton');
+  const buttonText = document.getElementById('button-text');
+  const loadingSpinner = document.getElementById('loading-spinner');
+  
+  // Show loading state
+  button.disabled = true;
+  buttonText.classList.add('hidden');
+  loadingSpinner.classList.remove('hidden');
+  
+  // Remove existing error messages
+  const existingError = document.getElementById('error-message');
+  if (existingError) existingError.remove();
+  
+  // Create form data
+  const formData = new FormData();
+  formData.append('email', email);
+  formData.append('password', password);
+  
+  // Submit login request
+  fetch('/api/login', {
+    method: 'POST',
+    body: formData,
+    credentials: 'same-origin'
+  })
+  .then(response => {
+    if (response.redirected || response.ok) {
+      // Success - redirect to dashboard
+      window.location.href = '/';
+    } else {
+      // Error - show error message
+      return response.text().then(text => {
+        throw new Error('Login failed');
+      });
+    }
+  })
+  .catch(error => {
+    console.error('Login error:', error);
+    
+    // Show error message
+    const errorDiv = document.createElement('div');
+    errorDiv.id = 'error-message';
+    errorDiv.className = 'rounded-md bg-red-50 p-4';
+    errorDiv.innerHTML = `
+      <div class="flex">
+        <i class="fas fa-exclamation-circle text-red-400 mr-3 mt-0.5"></i>
+        <div class="text-sm text-red-700">Login failed. Please check your credentials and try again.</div>
+      </div>
+    `;
+    
+    // Insert error before the button
+    form.insertBefore(errorDiv, button.parentElement);
+    
+    // Reset button state
+    button.disabled = false;
+    buttonText.classList.remove('hidden');
+    loadingSpinner.classList.add('hidden');
+  });
+}
+
 // ============== GLOBAL STATE ==============
 let currentUser = null;
 let dashboardData = null;
@@ -687,6 +755,15 @@ function initSchedule() {
 // Initialize app based on current page
 function initApp() {
   const path = window.location.pathname;
+  
+  // Initialize login form if on login page
+  if (path === '/login') {
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+      loginForm.addEventListener('submit', handleLogin);
+      console.log('Login form initialized');
+    }
+  }
   
   // Determine which page we're on and initialize accordingly
   if (path === '/schedule') {

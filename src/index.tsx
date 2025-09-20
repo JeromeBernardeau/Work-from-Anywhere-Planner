@@ -92,8 +92,8 @@ const createUserSession = async (c: any, user: User): Promise<string> => {
   expiresAt.setDate(expiresAt.getDate() + 7) // 7 days
 
   await c.env.DB.prepare(`
-    INSERT INTO user_sessions (id, user_id, email, expires_at, ip_address, user_agent)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO user_sessions (id, user_id, email, expires_at, ip_address, user_agent, active)
+    VALUES (?, ?, ?, ?, ?, ?, 1)
   `).bind(
     sessionId,
     user.id,
@@ -152,7 +152,7 @@ app.get('/login', (c) => {
           </p>
         </div>
         
-        <form className="mt-8 space-y-6" action="/api/login" method="POST">
+        <form id="loginForm" className="mt-8 space-y-6">
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">Email address</label>
@@ -181,7 +181,7 @@ app.get('/login', (c) => {
           </div>
 
           {error && (
-            <div className="rounded-md bg-red-50 p-4">
+            <div id="error-message" className="rounded-md bg-red-50 p-4">
               <div className="flex">
                 <i className="fas fa-exclamation-circle text-red-400 mr-3 mt-0.5"></i>
                 <div className="text-sm text-red-700">{error}</div>
@@ -190,7 +190,7 @@ app.get('/login', (c) => {
           )}
 
           {message && (
-            <div className="rounded-md bg-green-50 p-4">
+            <div id="success-message" className="rounded-md bg-green-50 p-4">
               <div className="flex">
                 <i className="fas fa-check-circle text-green-400 mr-3 mt-0.5"></i>
                 <div className="text-sm text-green-700">{message}</div>
@@ -200,13 +200,17 @@ app.get('/login', (c) => {
 
           <div>
             <button
+              id="loginButton"
               type="submit"
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
             >
               <span className="absolute left-0 inset-y-0 flex items-center pl-3">
                 <i className="fas fa-lock text-blue-500 group-hover:text-blue-400"></i>
               </span>
-              Sign in
+              <span id="button-text">Sign in</span>
+              <span id="loading-spinner" className="hidden">
+                <i className="fas fa-spinner fa-spin"></i>
+              </span>
             </button>
           </div>
 
