@@ -628,10 +628,39 @@ async function saveUserHabits() {
     const data = await response.json();
 
     if (response.ok) {
-      showNotification('Habits saved successfully! They will apply to all future weeks.', 'success');
+      showNotification('Habits saved successfully! Applying to future weeks...', 'success');
       document.getElementById('habits-modal').remove();
       
-      // Optionally reload current week to show any changes
+      // Apply habits to the next 8 weeks automatically
+      try {
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(startDate.getDate() + (8 * 7)); // 8 weeks from now
+        
+        const applyResponse = await fetch('/api/habits/apply', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            userId: userId,
+            startDate: startDate.toISOString().split('T')[0],
+            endDate: endDate.toISOString().split('T')[0]
+          })
+        });
+        
+        const applyData = await applyResponse.json();
+        
+        if (applyResponse.ok) {
+          showNotification(`Habits applied successfully! ${applyData.entries || 0} schedule entries created for future weeks.`, 'success');
+        } else {
+          console.warn('Failed to apply habits automatically:', applyData.error);
+        }
+      } catch (error) {
+        console.warn('Error applying habits automatically:', error);
+      }
+      
+      // Reload current week to show any changes
       loadWeeklySchedule();
     } else {
       showNotification('Failed to save habits: ' + (data.error || 'Unknown error'), 'error');
