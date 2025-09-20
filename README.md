@@ -7,7 +7,7 @@
 
 ## 🌍 Live URLs
 - **Production**: https://ficofi-work-planner.pages.dev
-- **Latest Deploy**: https://05941ae6.ficofi-work-planner.pages.dev  
+- **Latest Deploy**: https://0f801f1a.ficofi-work-planner.pages.dev  
 - **Development**: https://3000-iw7u7b85utjisczxqrd30-6532622b.e2b.dev
 - **GitHub**: https://github.com/JeromeBernardeau/Work-from-Anywhere-Planner
 
@@ -43,12 +43,17 @@
 - **✅ FIXED: Login form handling** - Resolved Content-Type issues for seamless authentication
 
 ### 🎯 **Recent Fixes & Enhancements (Latest Update)**
+- **✅ SET HABITS FUNCTIONALITY COMPLETELY FIXED**:
+  - **DATABASE SCHEMA FIX**: Added missing `updated_at` column to `recurring_patterns` table
+  - **AUTOMATIC HABIT APPLICATION**: After saving habits, system automatically applies them to next 8 weeks
+  - **CALENDAR INTEGRATION**: Schedule automatically refreshes and shows updated habit-based entries
+  - **ERROR RESOLUTION**: Fixed "Internal server error" when saving habits - now works perfectly
+  - **PRODUCTION DATABASE MIGRATED**: All schema fixes deployed to production environment
 - **✅ LOGIN ISSUE PERMANENTLY FIXED - ROOT CAUSE RESOLVED**: 
   - **CRITICAL SESSION BUG FIXED**: Session creation was missing `active=1` field causing session validation failures
   - **ROBUST JAVASCRIPT LOGIN**: Added client-side form handling with loading states and error handling
   - **COMPREHENSIVE TESTING**: Backend login works via cURL, browser login works via JavaScript
   - **SESSION MANAGEMENT VERIFIED**: Full login → dashboard flow working with proper session cookies
-  - **PRODUCTION DEPLOYED**: Live fix verified on both development and production environments
 - **✅ Set Habits Modal Improvements**: 
   - Removed Saturday and Sunday columns (weekdays only: Mon-Fri)
   - Set "In Office" as default selection for all time slots
