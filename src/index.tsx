@@ -230,26 +230,32 @@ app.post('/api/login', async (c) => {
     let password: string | null = ''
     
     const contentType = c.req.header('content-type') || ''
+    console.log('Login attempt - Content-Type:', contentType)
     
-    if (contentType.includes('application/json')) {
-      // Handle JSON data
-      const json = await c.req.json()
-      email = json.email
-      password = json.password
-    } else if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
-      // Handle form data
-      const formData = await c.req.formData()
-      email = formData.get('email') as string
-      password = formData.get('password') as string
-    } else {
-      // Try to parse as JSON first, then form data
-      try {
+    // Try form data first (most common from HTML forms)
+    try {
+      if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+        const formData = await c.req.formData()
+        email = formData.get('email') as string
+        password = formData.get('password') as string
+        console.log('Form data parsed successfully')
+      } else if (contentType.includes('application/json')) {
+        // Handle JSON data
         const json = await c.req.json()
         email = json.email
         password = json.password
-      } catch {
-        return c.redirect('/login?error=Invalid request format')
+        console.log('JSON data parsed successfully')
+      } else {
+        // Fallback: try to parse as form data regardless of content type
+        console.log('Attempting fallback form data parsing...')
+        const formData = await c.req.formData()
+        email = formData.get('email') as string
+        password = formData.get('password') as string
+        console.log('Fallback form data parsed successfully')
       }
+    } catch (error) {
+      console.error('Login error:', error)
+      return c.redirect('/login?error=Invalid request format')
     }
 
     if (!email || !password) {
