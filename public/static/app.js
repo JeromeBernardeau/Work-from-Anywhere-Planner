@@ -7,6 +7,15 @@ let employees = [];
 let filters = { teams: [], sites: [], roles: [] };
 let currentWeekStart = null;
 
+// Status configuration according to Jerome's updated specifications
+const statusConfig = {
+  'WFH': { text: 'Work from Home', short: 'WFH', class: 'bg-blue-500 hover:bg-blue-600', color: 'Blue' },
+  'WFO': { text: 'Work From Overseas', short: 'WFO', class: 'bg-green-500 hover:bg-green-600', color: 'Green' },  
+  'TRIP': { text: 'Business Trip', short: 'Trip', class: 'bg-orange-500 hover:bg-orange-600', color: 'Orange' },
+  'LEAVE': { text: 'Leave/Time Off', short: 'Leave', class: 'bg-red-500 hover:bg-red-600', color: 'Red' },
+  'IN_OFFICE': { text: 'In Office', short: 'In Office', class: 'bg-gray-500 hover:bg-gray-600', color: 'Gray' }
+};
+
 // ============== UTILITY FUNCTIONS ==============
 
 // Format percentage with color coding
@@ -20,14 +29,14 @@ function formatPercentage(value, total = 100) {
   return { percentage, colorClass };
 }
 
-// Get status color class
+// Get status color class - Updated for Jerome's specifications
 function getStatusColor(status) {
   switch (status) {
-    case 'WFO': return 'bg-green-500 text-white';
-    case 'WFH': return 'bg-blue-500 text-white';
-    case 'TRIP': return 'bg-orange-500 text-white';
-    case 'LEAVE': return 'bg-red-500 text-white';
-    case 'OFF': return 'bg-gray-400 text-white';
+    case 'WFH': return 'bg-blue-500 text-white';      // Work from Home - Blue
+    case 'WFO': return 'bg-green-500 text-white';     // Work from Office - Green  
+    case 'TRIP': return 'bg-orange-500 text-white';   // Business Trip - Orange
+    case 'LEAVE': return 'bg-red-500 text-white';     // Leave/Time Off - Red
+    case 'IN_OFFICE': return 'bg-gray-500 text-white'; // In Office - Gray
     default: return 'bg-gray-200 text-gray-600';
   }
 }
@@ -73,49 +82,6 @@ async function fetchDashboardData() {
     console.error('Error fetching dashboard data:', error);
     showNotification('Error loading dashboard data', 'error');
     return null;
-  }
-}
-
-// Fetch employees
-async function fetchEmployees(search = '', team = '', site = '', role = '') {
-  try {
-    const params = new URLSearchParams();
-    if (search) params.append('search', search);
-    if (team) params.append('team', team);
-    if (site) params.append('site', site);
-    if (role) params.append('role', role);
-    
-    const response = await fetch(`/api/employees?${params}`);
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to fetch employees');
-    }
-    
-    employees = data.employees;
-    return data.employees;
-  } catch (error) {
-    console.error('Error fetching employees:', error);
-    showNotification('Error loading employees', 'error');
-    return [];
-  }
-}
-
-// Fetch filter options
-async function fetchFilters() {
-  try {
-    const response = await fetch('/api/filters');
-    const data = await response.json();
-    
-    if (!response.ok) {
-      throw new Error(data.error || 'Failed to fetch filters');
-    }
-    
-    filters = data;
-    return data;
-  } catch (error) {
-    console.error('Error fetching filters:', error);
-    return { teams: [], sites: [], roles: [] };
   }
 }
 
@@ -192,55 +158,79 @@ function showNotification(message, type = 'info') {
   }, 3000);
 }
 
-// Update dashboard metrics
-function updateDashboardMetrics(data) {
-  if (!data || !data.metrics) return;
-  
-  const { metrics } = data;
-  
-  const totalEmployeesEl = document.getElementById('total-employees');
-  const thisWeekOfficeEl = document.getElementById('this-week-office');
-  const nextWeekOfficeEl = document.getElementById('next-week-office');
-  const activeSitesEl = document.getElementById('active-sites');
-  const teamsTrackedEl = document.getElementById('teams-tracked');
-  
-  if (totalEmployeesEl) totalEmployeesEl.textContent = metrics.totalEmployees;
-  if (thisWeekOfficeEl) thisWeekOfficeEl.textContent = metrics.thisWeekOffice + '%';
-  if (nextWeekOfficeEl) nextWeekOfficeEl.textContent = metrics.nextWeekOffice + '%';
-  if (activeSitesEl) activeSitesEl.textContent = metrics.activeSites;
-  if (teamsTrackedEl) teamsTrackedEl.textContent = metrics.teamsTracked;
-}
-
 // ============== SCHEDULE MANAGEMENT ==============
 
-// Schedule slot click handler - Enhanced with full status cycle
-function handleScheduleSlotClick(event) {
-  const slot = event.target;
-  if (!slot.classList.contains('schedule-slot')) return;
+// Create status selection dropdown
+function createStatusDropdown(currentSlot, day, period) {
+  // Remove any existing dropdown
+  const existingDropdown = document.getElementById('status-dropdown');
+  if (existingDropdown) {
+    existingDropdown.remove();
+  }
   
-  const day = slot.dataset.day;
-  const period = slot.dataset.period;
+  const dropdown = document.createElement('div');
+  dropdown.id = 'status-dropdown';
+  dropdown.className = 'absolute z-50 bg-white border border-gray-300 rounded-lg shadow-lg p-2 min-w-48';
   
-  // Full status cycle with all work location options
-  const currentStatus = slot.textContent.trim();
-  const statusCycle = {
-    'Remote': { next: 'Office', status: 'WFO', class: 'bg-green-500 hover:bg-green-600' },
-    'Office': { next: 'Trip', status: 'TRIP', class: 'bg-orange-500 hover:bg-orange-600' },
-    'Trip': { next: 'Leave', status: 'LEAVE', class: 'bg-red-500 hover:bg-red-600' },
-    'Leave': { next: 'Off', status: 'OFF', class: 'bg-gray-400 hover:bg-gray-500' },
-    'Off': { next: 'Remote', status: 'WFH', class: 'bg-blue-500 hover:bg-blue-600' }
-  };
+  // Position dropdown near the clicked slot
+  const rect = currentSlot.getBoundingClientRect();
+  dropdown.style.left = rect.left + window.scrollX + 'px';
+  dropdown.style.top = (rect.bottom + window.scrollY + 5) + 'px';
   
-  const nextState = statusCycle[currentStatus] || statusCycle['Remote'];
+  // Create dropdown content
+  dropdown.innerHTML = `
+    <div class="text-sm font-semibold text-gray-700 mb-2 p-2 border-b">
+      Select Status for ${day.toUpperCase()} ${period}
+    </div>
+  `;
   
-  // Update UI immediately for better UX
+  // Add status options
+  Object.entries(statusConfig).forEach(([status, config]) => {
+    const option = document.createElement('button');
+    option.className = `w-full text-left px-3 py-2 text-sm rounded hover:bg-gray-100 flex items-center space-x-2`;
+    option.innerHTML = `
+      <div class="w-4 h-4 rounded ${config.class.split(' ')[0]}"></div>
+      <span>${config.text}</span>
+    `;
+    
+    option.addEventListener('click', () => {
+      updateSlotStatus(currentSlot, day, period, status, config);
+      dropdown.remove();
+    });
+    
+    dropdown.appendChild(option);
+  });
+  
+  // Add close button
+  const closeButton = document.createElement('button');
+  closeButton.className = 'w-full text-center px-3 py-2 text-sm text-gray-500 hover:bg-gray-100 border-t mt-2';
+  closeButton.textContent = 'Cancel';
+  closeButton.addEventListener('click', () => dropdown.remove());
+  dropdown.appendChild(closeButton);
+  
+  document.body.appendChild(dropdown);
+  
+  // Close dropdown when clicking outside
+  setTimeout(() => {
+    document.addEventListener('click', function closeDropdown(e) {
+      if (!dropdown.contains(e.target)) {
+        dropdown.remove();
+        document.removeEventListener('click', closeDropdown);
+      }
+    });
+  }, 100);
+}
+
+// Update slot status (called from dropdown selection)
+async function updateSlotStatus(slot, day, period, status, config) {
+  // Update UI immediately
   const originalText = slot.textContent;
   const originalClass = slot.className;
   
-  slot.textContent = nextState.next;
-  slot.className = `schedule-slot h-16 text-white rounded-lg ${nextState.class}`;
+  slot.textContent = config.short;
+  slot.className = `schedule-slot h-16 text-white rounded-lg transition-colors ${config.class}`;
   
-  // Calculate actual date based on day and current week
+  // Calculate actual date
   const weekStart = currentWeekStart || getCurrentWeekStart();
   const dayOffset = {
     'mon': 0, 'tue': 1, 'wed': 2, 'thu': 3, 'fri': 4
@@ -250,19 +240,37 @@ function handleScheduleSlotClick(event) {
   targetDate.setDate(weekStart.getDate() + dayOffset);
   const dateStr = formatDate(targetDate);
   
-  // Send API request to update schedule
-  const userId = 43; // Jerome's user ID (in production, get from session)
+  // Get current user ID from hidden input (Jerome's actual ID)
+  const userIdElement = document.getElementById('current-user-id');
+  const userId = userIdElement ? parseInt(userIdElement.value) : 11; // Jerome's correct ID is 11
   
-  updateSchedule(userId, dateStr, period, nextState.status)
-    .then(() => {
-      showNotification(`Schedule updated: ${day.toUpperCase()} ${period} → ${nextState.next}`, 'success');
-    })
-    .catch(error => {
-      // Revert UI on error
-      slot.textContent = originalText;
-      slot.className = originalClass;
-      showNotification('Failed to update schedule. Please try again.', 'error');
-    });
+  try {
+    await updateSchedule(userId, dateStr, period, status);
+    showNotification(`Schedule updated: ${day.toUpperCase()} ${period} → ${config.text}`, 'success');
+  } catch (error) {
+    // Revert UI on error
+    slot.textContent = originalText;
+    slot.className = originalClass;
+    showNotification('Failed to update schedule. Please try again.', 'error');
+    console.error('Schedule update error:', error);
+  }
+}
+
+// Schedule slot click handler - Shows dropdown for status selection
+function handleScheduleSlotClick(event) {
+  const slot = event.target;
+  if (!slot.classList.contains('schedule-slot')) return;
+  
+  const day = slot.dataset.day;
+  const period = slot.dataset.period;
+  
+  if (!day || !period) {
+    console.error('Missing day or period data on schedule slot');
+    return;
+  }
+  
+  // Create and show status selection dropdown
+  createStatusDropdown(slot, day, period);
 }
 
 // Week navigation handlers
@@ -303,12 +311,394 @@ function handleQuickToggle(status) {
   const todayName = dayNames[today.getDay()];
   
   // Find today's slots
-  const todaySlots = document.querySelectorAll(`[data-day=\"${todayName}\"]`);
+  const todaySlots = document.querySelectorAll(`[data-day="${todayName}"]`);
   
   if (todaySlots.length === 0) {
     showNotification(`No schedule slots found for today (${todayName.toUpperCase()})`, 'warning');
     return;
   }
   
-  // Status configuration
-  const statusConfig = {\n    'office': { text: 'Office', status: 'WFO', class: 'bg-green-500 hover:bg-green-600' },\n    'remote': { text: 'Remote', status: 'WFH', class: 'bg-blue-500 hover:bg-blue-600' }\n  };\n  \n  const config = statusConfig[status];\n  if (!config) return;\n  \n  // Update all today's slots (AM and PM)\n  todaySlots.forEach(slot => {\n    slot.textContent = config.text;\n    slot.className = `schedule-slot h-16 text-white rounded-lg ${config.class}`;\n    \n    // Update via API\n    const userId = 43; // Jerome's ID\n    const dateStr = formatDate(today);\n    const period = slot.dataset.period;\n    \n    updateSchedule(userId, dateStr, period, config.status)\n      .catch(error => {\n        showNotification(`Failed to update ${period} schedule`, 'error');\n      });\n  });\n  \n  showNotification(`Today set to ${config.text}`, 'success');\n}\n\n// Load weekly schedule from API\nasync function loadWeeklySchedule() {\n  const userId = 43; // Jerome's ID\n  const weekStart = currentWeekStart || getCurrentWeekStart();\n  const weekEnd = new Date(weekStart);\n  weekEnd.setDate(weekStart.getDate() + 6);\n  \n  try {\n    const schedules = await fetchUserSchedule(userId, formatDate(weekStart), formatDate(weekEnd));\n    \n    // Clear current schedule display\n    const slots = document.querySelectorAll('.schedule-slot');\n    slots.forEach(slot => {\n      slot.textContent = 'Remote'; // Default\n      slot.className = 'schedule-slot h-16 bg-blue-500 text-white rounded-lg hover:bg-blue-600';\n    });\n    \n    // Apply loaded schedules\n    schedules.forEach(schedule => {\n      const scheduleDate = new Date(schedule.date);\n      const dayOffset = Math.floor((scheduleDate - weekStart) / (24 * 60 * 60 * 1000));\n      const dayName = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][dayOffset];\n      \n      if (dayName && dayOffset < 5) { // Only weekdays\n        const slot = document.querySelector(`[data-day=\"${dayName}\"][data-period=\"${schedule.time_period}\"]`);\n        if (slot) {\n          const statusDisplay = {\n            'WFH': { text: 'Remote', class: 'bg-blue-500 hover:bg-blue-600' },\n            'WFO': { text: 'Office', class: 'bg-green-500 hover:bg-green-600' },\n            'TRIP': { text: 'Trip', class: 'bg-orange-500 hover:bg-orange-600' },\n            'LEAVE': { text: 'Leave', class: 'bg-red-500 hover:bg-red-600' },\n            'OFF': { text: 'Off', class: 'bg-gray-400 hover:bg-gray-500' }\n          };\n          \n          const display = statusDisplay[schedule.status] || statusDisplay['WFH'];\n          slot.textContent = display.text;\n          slot.className = `schedule-slot h-16 text-white rounded-lg ${display.class}`;\n        }\n      }\n    });\n    \n  } catch (error) {\n    showNotification('Failed to load weekly schedule', 'error');\n  }\n}\n\n// ============== OTHER UI FUNCTIONS ==============\n\n// Render presence by site\nfunction renderPresenceBySite(sites) {\n  const container = document.getElementById('presence-by-site');\n  if (!container || !sites) return;\n  \n  const html = sites.map(site => {\n    const percentage = site.total_employees > 0 \n      ? Math.round((site.office_today / site.total_employees) * 100) \n      : 0;\n    const { colorClass } = formatPercentage(site.office_today, site.total_employees);\n    \n    return `\n      <div class=\"flex items-center justify-between mb-4\">\n        <div class=\"flex-1\">\n          <div class=\"flex items-center justify-between mb-1\">\n            <span class=\"text-sm font-medium text-gray-700\">${site.site}</span>\n            <span class=\"text-sm ${colorClass}\">${percentage}%</span>\n          </div>\n          <div class=\"flex items-center justify-between text-xs text-gray-500 mb-2\">\n            <span>${site.total_employees} employees</span>\n            <span>This Week: ${percentage}%</span>\n          </div>\n          <div class=\"w-full bg-gray-200 rounded-full h-2\">\n            <div class=\"h-2 rounded-full transition-all duration-300\" \n                 style=\"width: ${percentage}%; background-color: ${percentage >= 70 ? '#10b981' : percentage >= 40 ? '#3b82f6' : '#9ca3af'}\"></div>\n          </div>\n        </div>\n      </div>\n    `;\n  }).join('');\n  \n  container.innerHTML = html;\n}\n\n// Render presence by team\nfunction renderPresenceByTeam(teams) {\n  const container = document.getElementById('presence-by-team');\n  if (!container || !teams) return;\n  \n  const html = teams.map(team => {\n    const percentage = team.total_members > 0 \n      ? Math.round((team.office_today / team.total_members) * 100) \n      : 0;\n    const { colorClass } = formatPercentage(team.office_today, team.total_members);\n    \n    return `\n      <div class=\"flex items-center justify-between mb-4\">\n        <div class=\"flex-1\">\n          <div class=\"flex items-center justify-between mb-1\">\n            <span class=\"text-sm font-medium text-gray-700\">${team.department}</span>\n            <span class=\"text-sm ${colorClass}\">${percentage}%</span>\n          </div>\n          <div class=\"flex items-center justify-between text-xs text-gray-500 mb-2\">\n            <span>${team.total_members} members</span>\n            <span>${percentage}%</span>\n          </div>\n          <div class=\"w-full bg-gray-200 rounded-full h-2\">\n            <div class=\"h-2 rounded-full transition-all duration-300\" \n                 style=\"width: ${percentage}%; background-color: ${percentage >= 70 ? '#10b981' : percentage >= 40 ? '#3b82f6' : '#9ca3af'}\"></div>\n          </div>\n        </div>\n      </div>\n    `;\n  }).join('');\n  \n  container.innerHTML = html;\n}\n\n// Render heatmap\nfunction renderHeatmap(heatmapData) {\n  const container = document.getElementById('heatmap-grid');\n  if (!container) return;\n  \n  const heatmapLookup = {};\n  heatmapData?.forEach(item => {\n    const key = `${item.day_of_week}-${item.time_period}`;\n    heatmapLookup[key] = {\n      percentage: item.total_count > 0 ? Math.round((item.office_count / item.total_count) * 100) : 0,\n      count: item.office_count\n    };\n  });\n  \n  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];\n  const periods = ['AM', 'PM'];\n  \n  const html = periods.map(period => {\n    const row = days.map(day => {\n      const key = `${day}-${period}`;\n      const data = heatmapLookup[key] || { percentage: 0, count: 0 };\n      const colorClass = getHeatmapColor(data.percentage);\n      \n      return `\n        <div class=\"${colorClass} h-12 rounded flex items-center justify-center text-white text-sm font-medium\" \n             title=\"${day} ${period}: ${data.percentage}% (${data.count} in office)\">\n          ${data.percentage}%\n        </div>\n      `;\n    }).join('');\n    \n    return `\n      <div class=\"grid grid-cols-6 gap-2 mb-2\">\n        <div class=\"text-sm font-medium text-gray-700 flex items-center\">${period}</div>\n        ${row}\n      </div>\n    `;\n  }).join('');\n  \n  container.innerHTML = html;\n}\n\n// Render employee directory\nfunction renderEmployeeDirectory(employeeList) {\n  const container = document.getElementById('employee-directory');\n  if (!container) return;\n  \n  if (!employeeList || employeeList.length === 0) {\n    container.innerHTML = `\n      <div class=\"p-8 text-center text-gray-500\">\n        <i class=\"fas fa-users text-4xl mb-4\"></i>\n        <p>No employees found</p>\n      </div>\n    `;\n    return;\n  }\n  \n  const html = employeeList.map(employee => {\n    const { colorClass } = formatPercentage(employee.this_week_percentage, 100);\n    \n    return `\n      <div class=\"flex items-center justify-between p-4 border-b border-gray-200 hover:bg-gray-50\">\n        <div class=\"flex items-center space-x-4\">\n          <div class=\"w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold\">\n            ${employee.display_name.split(' ').map(n => n[0]).join('').substring(0, 2)}\n          </div>\n          <div>\n            <h4 class=\"font-medium text-gray-900\">${employee.display_name}</h4>\n            <div class=\"text-sm text-gray-500\">\n              <span>${employee.email}</span> • \n              <span>${employee.department}</span> • \n              <span>${employee.site}</span>\n            </div>\n          </div>\n        </div>\n        <div class=\"flex items-center space-x-4\">\n          <div class=\"text-right\">\n            <div class=\"text-sm font-medium text-gray-700\">${employee.role}</div>\n            <div class=\"text-xs text-gray-500\">This Week: <span class=\"${colorClass}\">${employee.this_week_percentage}%</span></div>\n          </div>\n        </div>\n      </div>\n    `;\n  }).join('');\n  \n  container.innerHTML = html;\n  \n  // Update showing count\n  const showingCountEl = document.getElementById('showing-count');\n  if (showingCountEl) {\n    showingCountEl.textContent = `Showing ${employeeList.length} of ${employeeList.length} employees`;\n  }\n}\n\n// Populate filter dropdowns\nfunction populateFilters() {\n  const teamFilter = document.getElementById('team-filter');\n  const siteFilter = document.getElementById('site-filter');\n  const roleFilter = document.getElementById('role-filter');\n  \n  if (teamFilter && filters.teams) {\n    teamFilter.innerHTML = '<option value=\"\">All Teams</option>' + \n      filters.teams.map(team => `<option value=\"${team}\">${team}</option>`).join('');\n  }\n  \n  if (siteFilter && filters.sites) {\n    siteFilter.innerHTML = '<option value=\"\">All Sites</option>' + \n      filters.sites.map(site => `<option value=\"${site}\">${site}</option>`).join('');\n  }\n  \n  if (roleFilter && filters.roles) {\n    roleFilter.innerHTML = '<option value=\"\">All Roles</option>' + \n      filters.roles.map(role => `<option value=\"${role}\">${role}</option>`).join('');\n  }\n}\n\n// ============== EVENT HANDLERS ==============\n\n// Filter employees based on current filter values\nfunction handleFilterChange() {\n  const search = document.getElementById('employee-search')?.value || '';\n  const team = document.getElementById('team-filter')?.value || '';\n  const site = document.getElementById('site-filter')?.value || '';\n  const role = document.getElementById('role-filter')?.value || '';\n  \n  fetchEmployees(search, team, site, role).then(employees => {\n    renderEmployeeDirectory(employees);\n  });\n}\n\n// ============== PAGE-SPECIFIC INITIALIZATION ==============\n\n// Initialize dashboard page\nfunction initDashboard() {\n  fetchDashboardData().then(data => {\n    if (data) {\n      updateDashboardMetrics(data);\n      renderPresenceBySite(data.presenceBySite);\n      renderPresenceByTeam(data.presenceByTeam);\n      renderHeatmap(data.heatmapData);\n    }\n  });\n}\n\n// Initialize organization page\nfunction initOrganization() {\n  Promise.all([\n    fetchFilters(),\n    fetchEmployees()\n  ]).then(([filtersData, employeesData]) => {\n    populateFilters();\n    renderEmployeeDirectory(employeesData);\n  });\n  \n  // Set up event listeners for filters\n  const searchInput = document.getElementById('employee-search');\n  const teamFilter = document.getElementById('team-filter');\n  const siteFilter = document.getElementById('site-filter');\n  const roleFilter = document.getElementById('role-filter');\n  \n  if (searchInput) {\n    let searchTimeout;\n    searchInput.addEventListener('input', () => {\n      clearTimeout(searchTimeout);\n      searchTimeout = setTimeout(handleFilterChange, 300);\n    });\n  }\n  \n  [teamFilter, siteFilter, roleFilter].forEach(filter => {\n    if (filter) {\n      filter.addEventListener('change', handleFilterChange);\n    }\n  });\n}\n\n// Initialize schedule page\nfunction initSchedule() {\n  // Initialize current week\n  currentWeekStart = getCurrentWeekStart();\n  \n  // Load initial schedule\n  loadWeeklySchedule();\n  \n  // Set up schedule slot click handlers\n  document.addEventListener('click', (event) => {\n    if (event.target.classList.contains('schedule-slot')) {\n      handleScheduleSlotClick(event);\n    }\n  });\n  \n  // Week navigation\n  const prevWeekBtn = document.getElementById('prev-week');\n  const nextWeekBtn = document.getElementById('next-week');\n  \n  if (prevWeekBtn) {\n    prevWeekBtn.addEventListener('click', () => handleWeekNavigation(-1));\n  }\n  \n  if (nextWeekBtn) {\n    nextWeekBtn.addEventListener('click', () => handleWeekNavigation(1));\n  }\n  \n  // Quick toggle buttons\n  const officeToggle = document.getElementById('office-toggle');\n  const remoteToggle = document.getElementById('remote-toggle');\n  \n  if (officeToggle) {\n    officeToggle.addEventListener('click', () => handleQuickToggle('office'));\n  }\n  \n  if (remoteToggle) {\n    remoteToggle.addEventListener('click', () => handleQuickToggle('remote'));\n  }\n}\n\n// ============== MAIN INITIALIZATION ==============\n\n// Initialize app based on current page\nfunction initApp() {\n  const path = window.location.pathname;\n  \n  // Determine which page we're on and initialize accordingly\n  if (path === '/' || path === '/analytics') {\n    initDashboard();\n  } else if (path === '/organization') {\n    initOrganization();\n  } else if (path === '/schedule') {\n    initSchedule();\n  }\n  \n  // Global notification for successful loading\n  setTimeout(() => {\n    showNotification('FICOFI Work Planner loaded successfully', 'success');\n  }, 1000);\n}\n\n// Initialize when DOM is ready\nif (document.readyState === 'loading') {\n  document.addEventListener('DOMContentLoaded', initApp);\n} else {\n  initApp();\n}"
+  // Status configuration for quick toggles
+  const quickStatusConfig = {
+    'office': { text: 'WFO', status: 'WFO', class: 'bg-green-500 hover:bg-green-600' },
+    'remote': { text: 'WFH', status: 'WFH', class: 'bg-blue-500 hover:bg-blue-600' }
+  };
+  
+  const config = quickStatusConfig[status];
+  if (!config) return;
+  
+  // Get current user ID
+  const userIdElement = document.getElementById('current-user-id');
+  const userId = userIdElement ? parseInt(userIdElement.value) : 11;
+  
+  // Update all today's slots (AM and PM)
+  todaySlots.forEach(slot => {
+    slot.textContent = config.text;
+    slot.className = `schedule-slot h-16 text-white rounded-lg transition-colors ${config.class}`;
+    
+    // Update via API
+    const dateStr = formatDate(today);
+    const period = slot.dataset.period;
+    
+    updateSchedule(userId, dateStr, period, config.status)
+      .catch(error => {
+        showNotification(`Failed to update ${period} schedule`, 'error');
+      });
+  });
+  
+  showNotification(`Today set to ${config.text}`, 'success');
+}
+
+// ============== HABITS MANAGEMENT ==============
+
+// Create and show Set Habits modal
+function createHabitsModal() {
+  // Remove existing modal if any
+  const existingModal = document.getElementById('habits-modal');
+  if (existingModal) {
+    existingModal.remove();
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'habits-modal';
+  modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50';
+  
+  modal.innerHTML = `
+    <div class="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+      <div class="mt-3">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-gray-900">Set Weekly Habits</h3>
+          <button id="close-habits-modal" class="text-gray-400 hover:text-gray-600">
+            <i class="fas fa-times text-xl"></i>
+          </button>
+        </div>
+        
+        <p class="text-sm text-gray-600 mb-6">
+          Set your default weekly schedule. These habits will be applied to all future weeks automatically.
+        </p>
+        
+        <div class="space-y-4">
+          <div class="grid grid-cols-6 gap-2 text-sm font-medium text-gray-700 mb-2">
+            <div></div>
+            <div class="text-center">Mon</div>
+            <div class="text-center">Tue</div>
+            <div class="text-center">Wed</div>
+            <div class="text-center">Thu</div>
+            <div class="text-center">Fri</div>
+          </div>
+          
+          <div class="grid grid-cols-6 gap-2 mb-2">
+            <div class="text-sm font-medium text-gray-700 flex items-center">AM</div>
+            <select class="habit-select border rounded p-1 text-sm" data-day="1" data-period="AM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="2" data-period="AM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="3" data-period="AM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="4" data-period="AM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="5" data-period="AM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+          </div>
+          
+          <div class="grid grid-cols-6 gap-2">
+            <div class="text-sm font-medium text-gray-700 flex items-center">PM</div>
+            <select class="habit-select border rounded p-1 text-sm" data-day="1" data-period="PM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="2" data-period="PM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="3" data-period="PM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="4" data-period="PM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+            <select class="habit-select border rounded p-1 text-sm" data-day="5" data-period="PM">
+              <option value="WFH">WFH</option>
+              <option value="WFO">WFO</option>
+              <option value="TRIP">Trip</option>
+              <option value="LEAVE">Leave</option>
+              <option value="IN_OFFICE" selected>In Office</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="flex items-center justify-between mt-6 pt-4 border-t">
+          <div class="text-sm text-gray-600">
+            <i class="fas fa-info-circle mr-1"></i>
+            Changes will apply to all future weeks automatically
+          </div>
+          <div class="flex space-x-3">
+            <button id="cancel-habits" class="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600">
+              Cancel
+            </button>
+            <button id="save-habits" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <i class="fas fa-save mr-2"></i>
+              Save Habits
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Load existing habits
+  loadUserHabits();
+
+  // Event listeners
+  document.getElementById('close-habits-modal').addEventListener('click', () => modal.remove());
+  document.getElementById('cancel-habits').addEventListener('click', () => modal.remove());
+  document.getElementById('save-habits').addEventListener('click', saveUserHabits);
+
+  // Close modal when clicking outside
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
+}
+
+// Load existing user habits and populate the modal
+async function loadUserHabits() {
+  const userIdElement = document.getElementById('current-user-id');
+  const userId = userIdElement ? parseInt(userIdElement.value) : 11;
+
+  try {
+    const response = await fetch(`/api/habits/${userId}`);
+    const data = await response.json();
+
+    if (response.ok && data.habits) {
+      // Populate the modal selects with existing habits
+      data.habits.forEach(habit => {
+        const select = document.querySelector(`[data-day="${habit.day_of_week}"][data-period="${habit.time_period}"]`);
+        if (select) {
+          select.value = habit.status;
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Error loading habits:', error);
+  }
+}
+
+// Save user habits
+async function saveUserHabits() {
+  const userIdElement = document.getElementById('current-user-id');
+  const userId = userIdElement ? parseInt(userIdElement.value) : 11;
+
+  // Collect all habit selections
+  const selects = document.querySelectorAll('.habit-select');
+  const patterns = [];
+
+  selects.forEach(select => {
+    if (select.value) {
+      patterns.push({
+        dayOfWeek: parseInt(select.dataset.day),
+        timePeriod: select.dataset.period,
+        status: select.value
+      });
+    }
+  });
+
+  try {
+    const response = await fetch('/api/habits', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        userId: userId,
+        patterns: patterns
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showNotification('Habits saved successfully! They will apply to all future weeks.', 'success');
+      document.getElementById('habits-modal').remove();
+      
+      // Optionally reload current week to show any changes
+      loadWeeklySchedule();
+    } else {
+      showNotification('Failed to save habits: ' + (data.error || 'Unknown error'), 'error');
+    }
+  } catch (error) {
+    console.error('Error saving habits:', error);
+    showNotification('Failed to save habits. Please try again.', 'error');
+  }
+}
+
+// Load weekly schedule from API
+async function loadWeeklySchedule() {
+  // Get current user ID
+  const userIdElement = document.getElementById('current-user-id');
+  const userId = userIdElement ? parseInt(userIdElement.value) : 11; // Jerome's correct ID
+  
+  const weekStart = currentWeekStart || getCurrentWeekStart();
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  
+  // Update week range display
+  const weekRangeEl = document.getElementById('week-range');
+  if (weekRangeEl) {
+    const formatDisplayDate = (date) => {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+    
+    const weekEndForDisplay = new Date(weekStart);
+    weekEndForDisplay.setDate(weekStart.getDate() + 4); // Friday
+    weekRangeEl.textContent = `${formatDisplayDate(weekStart)} - ${formatDisplayDate(weekEndForDisplay)}`;
+  }
+  
+  try {
+    const schedules = await fetchUserSchedule(userId, formatDate(weekStart), formatDate(weekEnd));
+    
+    // Clear current schedule display with default WFH status
+    const slots = document.querySelectorAll('.schedule-slot');
+    slots.forEach(slot => {
+      slot.textContent = 'WFH'; // Default to Work from Home
+      slot.className = 'schedule-slot h-16 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors';
+    });
+    
+    // Apply loaded schedules using the new status configuration
+    schedules.forEach(schedule => {
+      const scheduleDate = new Date(schedule.date);
+      const dayOffset = Math.floor((scheduleDate - weekStart) / (24 * 60 * 60 * 1000));
+      const dayName = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'][dayOffset];
+      
+      if (dayName && dayOffset < 5) { // Only weekdays
+        const slot = document.querySelector(`[data-day="${dayName}"][data-period="${schedule.time_period}"]`);
+        if (slot) {
+          // Use the global statusConfig for consistency
+          const config = statusConfig[schedule.status];
+          if (config) {
+            slot.textContent = config.short;
+            slot.className = `schedule-slot h-16 text-white rounded-lg transition-colors ${config.class}`;
+          }
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error loading weekly schedule:', error);
+    showNotification('Failed to load weekly schedule', 'error');
+  }
+}
+
+// ============== PAGE INITIALIZATION ==============
+
+// Initialize schedule page
+function initSchedule() {
+  // Initialize current week
+  currentWeekStart = getCurrentWeekStart();
+  
+  // Load initial schedule
+  loadWeeklySchedule();
+  
+  // Set up schedule slot click handlers - FIXED
+  document.addEventListener('click', (event) => {
+    if (event.target.classList.contains('schedule-slot')) {
+      handleScheduleSlotClick(event);
+    }
+  });
+  
+  // Week navigation
+  const prevWeekBtn = document.getElementById('prev-week');
+  const nextWeekBtn = document.getElementById('next-week');
+  
+  if (prevWeekBtn) {
+    prevWeekBtn.addEventListener('click', () => handleWeekNavigation(-1));
+  }
+  
+  if (nextWeekBtn) {
+    nextWeekBtn.addEventListener('click', () => handleWeekNavigation(1));
+  }
+  
+  // Quick toggle buttons
+  const officeToggle = document.getElementById('office-toggle');
+  const remoteToggle = document.getElementById('remote-toggle');
+  
+  if (officeToggle) {
+    officeToggle.addEventListener('click', () => handleQuickToggle('office'));
+  }
+  
+  if (remoteToggle) {
+    remoteToggle.addEventListener('click', () => handleQuickToggle('remote'));
+  }
+
+  // Set Habits button event listener
+  const setHabitsBtn = document.getElementById('setHabitsBtn');
+  if (setHabitsBtn) {
+    setHabitsBtn.addEventListener('click', createHabitsModal);
+  }
+}
+
+// ============== MAIN INITIALIZATION ==============
+
+// Initialize app based on current page
+function initApp() {
+  const path = window.location.pathname;
+  
+  // Determine which page we're on and initialize accordingly
+  if (path === '/schedule') {
+    initSchedule();
+  }
+  
+  console.log('FICOFI Work Planner initialized for path:', path);
+}
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}

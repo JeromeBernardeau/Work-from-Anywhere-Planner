@@ -27,15 +27,27 @@
 
 ### 📅 **Interactive Schedule Management**
 - Weekly schedule grid with AM/PM granularity for precise planning
-- 5 status types: 🔵 Remote, 🟢 Office, 🟠 Trip, 🔴 Leave, ⚪ Off
-- Click-to-edit interface with instant visual feedback
+- 5 status types: 🔵 WFH (Work from Home), 🟢 WFO (Work From Overseas), 🟠 Trip (Business Trip), 🔴 Leave (Time Off), ⚪ In Office
+- Click-to-edit interface with instant visual feedback and dropdown selection
 - Week navigation for advance planning and recurring pattern setup
 - Quick toggle buttons for rapid daily status updates
+- **✅ NEW: Set Habits functionality** - Define default weekly schedules that apply to all future weeks
+- **✅ FIXED: "In Office" option** - Now fully functional in dropdown selection
+- **✅ UPDATED: WFO meaning** - Changed from "Work From Office" to "Work From Overseas" per Jerome's specifications
 
 ### 🔐 **User Authentication & Security**
+- **✅ COMPLETE: Unique 10-digit password system** - All 115 FICOFI employees have secure individual passwords
 - Role-based permissions with department hierarchy enforcement
 - Secure API endpoints with proper authorization and audit logging
 - User context management with manager/team access controls
+- **✅ FIXED: Login form handling** - Resolved Content-Type issues for seamless authentication
+
+### 🎯 **Recent Fixes & Enhancements (Latest Update)**
+- **Set Habits Modal**: Complete implementation for recurring weekly schedule patterns
+- **Status Label Corrections**: WFO now correctly displays "Work From Overseas" 
+- **Dropdown Functionality**: All status options including "In Office" now work properly
+- **Authentication Improvements**: Fixed form submission and password validation issues
+- **Database Integration**: Habits are stored and retrieved from Cloudflare D1 with user association
 
 ### 🏗️ **Technical Architecture**
 - **Backend**: Hono framework optimized for Cloudflare Workers edge runtime
