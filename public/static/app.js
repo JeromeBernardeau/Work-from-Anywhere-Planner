@@ -8,6 +8,13 @@ function handleLogin(event) {
   
   const form = event.target;
   const email = document.getElementById('email').value;
+  
+  // Validate email
+  if (!email) {
+    alert('Please enter your email address');
+    return;
+  }
+  
   // Password field disabled - not required for authentication
   const password = '';
   const button = document.getElementById('loginButton');
@@ -680,7 +687,7 @@ async function saveUserHabits() {
 async function loadWeeklySchedule() {
   // Get current user ID
   const userIdElement = document.getElementById('current-user-id');
-  const userId = userIdElement ? parseInt(userIdElement.value) : 11; // Jerome's correct ID
+  const userId = userIdElement ? parseInt(userIdElement.value) : 10; // Jerome's correct ID is 10
   
   const weekStart = currentWeekStart || getCurrentWeekStart();
   const weekEnd = new Date(weekStart);

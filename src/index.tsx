@@ -152,7 +152,7 @@ app.get('/login', (c) => {
           </p>
         </div>
         
-        <form id="loginForm" className="mt-8 space-y-6">
+        <form id="loginForm" action="/api/login" method="POST" className="mt-8 space-y-6">
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="email" className="sr-only">Email address</label>
@@ -171,11 +171,11 @@ app.get('/login', (c) => {
               <input
                 id="password"
                 name="password"
-                type="password"
-                autoComplete="current-password"
+                type="text"
+                value=""
                 className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-400 bg-gray-100 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="PASSWORD NOT REQUIRED - Disabled"
-                disabled
+                placeholder="NO PASSWORD REQUIRED - Leave empty"
+                readOnly
               />
             </div>
           </div>
@@ -269,31 +269,42 @@ app.post('/api/login', async (c) => {
     
     console.log(`⚠️ Password authentication disabled - Auto-login for: ${email}`)
 
-    // Find user by email
+    // Find user by email - SIMPLIFIED WITHOUT ANY CHECKS
     const user = await c.env.DB.prepare(`
-      SELECT * FROM users WHERE email = ? AND active = 1
+      SELECT * FROM users WHERE email = ?
     `).bind(email).first()
 
     if (!user) {
-      // Log failed attempt
-      await c.env.DB.prepare(`
-        INSERT INTO login_audit (email, success, failure_reason, ip_address, user_agent)
-        VALUES (?, 0, 'user_not_found', ?, ?)
-      `).bind(email, c.req.header('cf-connecting-ip') || 'unknown', c.req.header('user-agent') || 'unknown').run()
-
-      return c.redirect('/login?error=Invalid email or password')
+      console.log(`User not found: ${email}`)
+      console.log('Creating automatic session for demo...')
+      
+      // For demo - if user not found, create a temporary session anyway
+      const demoUser = {
+        email: email,
+        display_name: email.split('@')[0],
+        site: 'Paris',
+        department: 'Guest',
+        admin_access: 0
+      }
+      
+      // Create session for demo user
+      const sessionId = `sess_${Math.random().toString(36).substring(2)}`
+      c.cookie('session_id', sessionId, {
+        maxAge: 7 * 24 * 60 * 60, // 7 days
+        httpOnly: true,
+        secure: true,
+        sameSite: 'Lax'
+      })
+      
+      console.log(`Demo login successful for: ${email}`)
+      return c.redirect('/')
     }
 
-    // Check if account is locked
-    if (user.account_locked && new Date(user.account_locked) > new Date()) {
-      return c.redirect('/login?error=Account temporarily locked. Please try again later.')
-    }
-
-    // PASSWORD VERIFICATION DISABLED - Auto-login enabled
-    console.log(`✅ Password check bypassed for user: ${email}`)
+    // NO CHECKS - Direct login
+    console.log(`✅ Auto-login successful for: ${email}`)
     const passwordValid = true // Always valid - no password check
 
-    if (!passwordValid) {
+    if (false) { // Never execute password check
       // Increment login attempts
       const attempts = (user.login_attempts || 0) + 1
       let accountLocked = null
