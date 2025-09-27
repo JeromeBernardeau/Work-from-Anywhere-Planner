@@ -1566,9 +1566,6 @@ function openBulkEditModal() {
   showNotification('Bulk edit functionality coming soon', 'info');
 }
 
-  console.log('FICOFI Work Planner initialized for path:', path);
-}
-
 // Initialize when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initApp);
