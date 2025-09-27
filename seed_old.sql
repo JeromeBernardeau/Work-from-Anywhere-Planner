@@ -1,6 +1,5 @@
--- FICOFI Updated Employee Data Import
--- Based on the latest Excel spreadsheet (December 2024)
--- Key change: EO department renamed to ManCO
+-- FICOFI Employee Data Import
+-- Based on the provided employee spreadsheet
 
 -- Clear existing data (for development)
 DELETE FROM schedules;
@@ -8,23 +7,16 @@ DELETE FROM users;
 
 -- Insert all FICOFI employees
 INSERT OR REPLACE INTO users (display_name, email, site, department, manager_email, second_level_manager_email, admin_access) VALUES 
+-- EO Department
+('Philippe CAPDOUZE', 'pcapdouze@ficofi.com', 'Singapore', 'EO', NULL, NULL, 2),
+('Matthieu DESTOT', 'mdestot@ficofi.com', 'Singapore', 'EO', 'pcapdouze@ficofi.com', NULL, 2),
+('Marie CAPDOUZE', 'mcapdouze@ficofi.com', 'Singapore', 'EO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 0),
+('Deepak RAO', 'drao@ficofi.com', 'Singapore', 'EO', NULL, NULL, 1),
+
 -- Business Transformation
 ('Catherine TOBLER', 'ctobler@ficofi.com', 'Pessac', 'Business Transformation', 'asaccazes@ficofi.com', 'mdestot@ficofi.com', 0),
 
--- ManCO Department (formerly EO) 
-('Philippe CAPDOUZE', 'pcapdouze@ficofi.com', 'Singapore', 'ManCO', NULL, NULL, 2),
-('Matthieu DESTOT', 'mdestot@ficofi.com', 'Singapore', 'ManCO', 'pcapdouze@ficofi.com', NULL, 2),
-('Marie CAPDOUZE', 'mcapdouze@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', NULL, 0),
-('Deepak RAO', 'drao@ficofi.com', 'Singapore', 'ManCO', NULL, NULL, 1),
-('Alexandre SACCAZES', 'asaccazes@ficofi.com', 'Paris', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
-('Delphine FONTENEAU', 'dfonteneau@ficofi.com', 'Paris', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
-('Benjamin BAILLEUX', 'bbailleux@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
-('Edouard DAUTREIX', 'edautreix@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
-('Jerome BERNARDEAU', 'jbernardeau@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
-('Nina FERRET', 'nferret@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
-('Terence LEE', 'tlee@ficofi.com', 'Hong Kong', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
-
--- Estates Department  
+-- Estates Department
 ('Francis YUNG', 'fyung@ficofi.com', 'Hong Kong', 'Estates', 'qdelaclos@ficofi.com', 'drao@ficofi.com', 0),
 ('Charles-Erwan SAVARY', 'csavary@ficofi.com', 'Paris', 'Estates', 'drao@ficofi.com', NULL, 0),
 ('Mathieu GILLET', 'mgillet@ficofi.com', 'Paris', 'Estates', 'drao@ficofi.com', NULL, 0),
@@ -35,7 +27,7 @@ INSERT OR REPLACE INTO users (display_name, email, site, department, manager_ema
 ('Marina Chloe BURCELIN', 'mburcelin@ficofi.com', 'Singapore', 'Estates', 'qdelaclos@ficofi.com', 'drao@ficofi.com', 0),
 ('Quentin de LACLOS', 'qdelaclos@ficofi.com', 'Singapore', 'Estates', 'drao@ficofi.com', NULL, 1),
 
--- Finance Department (Missing Delphine ISAUTIER added)
+-- Finance Department
 ('Delphine ISAUTIER', 'disautier@ficofi.com', 'Singapore', 'Finance', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
 ('Hector BECHEMILH', 'hbechemilh@ficofi.com', 'Pessac', 'Finance', 'disautier@ficofi.com', 'mdestot@ficofi.com', 1),
 ('Laurence VADROT', 'lvadrot@ficofi.com', 'Pessac', 'Finance', 'disautier@ficofi.com', 'mdestot@ficofi.com', 0),
@@ -64,7 +56,16 @@ INSERT OR REPLACE INTO users (display_name, email, site, department, manager_ema
 ('Sterenn BERNARDEAU', 'sbernardeau@ficofi.com', 'Singapore', 'Legal', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
 ('Candise MU', 'cmu@ficofi.com', 'Singapore', 'Legal', 'sbernardeau@ficofi.com', 'mdestot@ficofi.com', 0),
 
--- Marketing  
+-- ManCO (Management)
+('Terence LEE', 'tlee@ficofi.com', 'Hong Kong', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
+('Alexandre SACCAZES', 'asaccazes@ficofi.com', 'Paris', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
+('Delphine FONTENEAU', 'dfonteneau@ficofi.com', 'Paris', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
+('Benjamin BAILLEUX', 'bbailleux@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
+('Edouard DAUTREIX', 'edautreix@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
+('Jerome BERNARDEAU', 'jbernardeau@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
+('Nina FERRET', 'nferret@ficofi.com', 'Singapore', 'ManCO', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
+
+-- Marketing
 ('Joris LALUC', 'jlaluc@ficofi.com', 'Paris', 'Marketing', 'dfonteneau@ficofi.com', 'mdestot@ficofi.com', 1),
 ('Michelle LO', 'mlo@ficofi.com', 'Hong Kong', 'Marketing', 'jlaluc@ficofi.com', 'dfonteneau@ficofi.com', 1),
 ('Pauline GEBRAEL', 'pgebrael@ficofi.com', 'Hong Kong', 'Marketing', 'jlaluc@ficofi.com', 'dfonteneau@ficofi.com', 1),
@@ -102,7 +103,8 @@ INSERT OR REPLACE INTO users (display_name, email, site, department, manager_ema
 ('Janice Ang', 'jang@ficofi.com', 'Singapore', 'Operations', 'khan@ficofi.com', 'edautreix@ficofi.com', 0),
 ('Mui San CHAN', 'mschan@ficofi.com', 'Singapore', 'Operations', 'khan@ficofi.com', 'edautreix@ficofi.com', 0),
 
--- Sales & Members (Note: Benjamin BAILLEUX appears in both ManCO and Sales, keeping ManCO entry)
+-- Sales & Members
+('Benjamin BAILLEUX', 'bbailleux@ficofi.com', 'Singapore', 'Sales & Members', 'mdestot@ficofi.com', 'pcapdouze@ficofi.com', 1),
 ('Bélinda DUPHIL', 'bduphil@ficofi.com', 'Pessac', 'Sales & Members', 'bbailleux@ficofi.com', 'mdestot@ficofi.com', 1),
 ('Roberta MITSUDA', 'rmitsuda@ficofi.com', 'Brazil', 'Sales & Members', 'bbailleux@ficofi.com', 'mdestot@ficofi.com', 0),
 ('Chris CHAU', 'cchau@ficofi.com', 'Hong Kong', 'Sales & Members', 'bbailleux@ficofi.com', 'mdestot@ficofi.com', 0),
@@ -130,7 +132,7 @@ INSERT OR REPLACE INTO users (display_name, email, site, department, manager_ema
 ('Maybel TAN', 'mtan@ficofi.com', 'Singapore', 'Sales & Members', 'bduphil@ficofi.com', 'bbailleux@ficofi.com', 0),
 ('Victor SIBE', 'vsibe@ficofi.com', 'Singapore', 'Sales & Members', 'bbailleux@ficofi.com', 'mdestot@ficofi.com', 0),
 
--- Technology Department  
+-- Technology Department (your team!)
 ('Christophe PERRET', 'cperret@ficofi.com', 'Pessac', 'Technology', 'jbernardeau@ficofi.com', 'mdestot@ficofi.com', 0),
 ('Nicolas SIRAC', 'nsirac@ficofi.com', 'Pessac', 'Technology', 'jbernardeau@ficofi.com', 'mdestot@ficofi.com', 0),
 ('Samuel VERRON', 'sverron@ficofi.com', 'Pessac', 'Technology', 'jbernardeau@ficofi.com', 'mdestot@ficofi.com', 0),
@@ -144,3 +146,35 @@ INSERT OR REPLACE INTO users (display_name, email, site, department, manager_ema
 ('Laurène CAILLETTE', 'lcaillette@ficofi.com', 'Pessac', 'Wines', 'nferret@ficofi.com', 'mdestot@ficofi.com', 0),
 ('Hugo COLLENOT-CHOLLEZ', 'hchollez@ficofi.com', 'Singapore', 'Wines', 'nferret@ficofi.com', 'mdestot@ficofi.com', 0),
 ('Pirom PHADOEMCHIT', 'pphadoemchit@ficofi.com', 'Singapore', 'Wines', 'nferret@ficofi.com', 'mdestot@ficofi.com', 0);
+
+-- Insert sample schedule data for this week (for demonstration)
+-- Current week: various realistic work patterns
+
+-- Generate some realistic schedules for demonstration
+INSERT OR REPLACE INTO schedules (user_id, date, time_period, status) 
+SELECT 
+  u.id,
+  date('now', 'localtime'),
+  'AM',
+  CASE 
+    WHEN u.site = 'Singapore' AND u.department = 'Technology' THEN 'WFH'
+    WHEN u.site = 'Paris' AND u.department = 'Marketing' THEN 'WFO'
+    WHEN u.site = 'Hong Kong' THEN 'WFO'
+    ELSE 'WFH'
+  END
+FROM users u
+WHERE u.active = 1;
+
+INSERT OR REPLACE INTO schedules (user_id, date, time_period, status) 
+SELECT 
+  u.id,
+  date('now', 'localtime'),
+  'PM',
+  CASE 
+    WHEN u.site = 'Singapore' AND u.department = 'Technology' THEN 'WFH'
+    WHEN u.site = 'Paris' AND u.department = 'Marketing' THEN 'WFO'
+    WHEN u.site = 'Hong Kong' THEN 'WFO'
+    ELSE 'WFH'
+  END
+FROM users u
+WHERE u.active = 1;
