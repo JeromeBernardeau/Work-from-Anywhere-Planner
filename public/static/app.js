@@ -322,7 +322,7 @@ async function updateSlotStatus(slot, day, period, status, config) {
   
   // Get current user ID from hidden input (Jerome's actual ID)
   const userIdElement = document.getElementById('current-user-id');
-  const userId = userIdElement ? parseInt(userIdElement.value) : 11; // Jerome's correct ID is 11
+  const userId = userIdElement ? parseInt(userIdElement.value) : 10; // Jerome's correct ID is 10
   
   try {
     await updateSchedule(userId, dateStr, period, status);
@@ -409,7 +409,7 @@ function handleQuickToggle(status) {
   
   // Get current user ID
   const userIdElement = document.getElementById('current-user-id');
-  const userId = userIdElement ? parseInt(userIdElement.value) : 11;
+  const userId = userIdElement ? parseInt(userIdElement.value) : 10; // Fixed Jerome's ID
   
   // Update all today's slots (AM and PM)
   todaySlots.forEach(slot => {
@@ -586,7 +586,7 @@ function createHabitsModal() {
 // Load existing user habits and populate the modal
 async function loadUserHabits() {
   const userIdElement = document.getElementById('current-user-id');
-  const userId = userIdElement ? parseInt(userIdElement.value) : 11;
+  const userId = userIdElement ? parseInt(userIdElement.value) : 10; // Fixed to Jerome's ID
 
   try {
     const response = await fetch(`/api/habits/${userId}`);
@@ -609,7 +609,7 @@ async function loadUserHabits() {
 // Save user habits
 async function saveUserHabits() {
   const userIdElement = document.getElementById('current-user-id');
-  const userId = userIdElement ? parseInt(userIdElement.value) : 11;
+  const userId = userIdElement ? parseInt(userIdElement.value) : 10; // Fixed to Jerome's ID
 
   // Collect all habit selections
   const selects = document.querySelectorAll('.habit-select');
