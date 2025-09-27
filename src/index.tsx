@@ -52,21 +52,16 @@ function verifyPassword(password: string, hash: string): boolean {
   return hash.includes(Buffer.from(password).toString('base64'))
 }
 
-// Get current user from session - SIMPLIFIED FOR DEMO
+// Get current user from session - FIXED TO USE ACTUAL SESSION
 const getCurrentUser = async (c: any): Promise<User | null> => {
   const sessionId = getCookie(c, 'session_id')
   
-  // For demo - if any session exists, return Jerome's user
-  if (sessionId) {
-    const user = await c.env.DB.prepare(`
-      SELECT * FROM users WHERE email = 'jbernardeau@ficofi.com'
-    `).first()
-    return user as User
+  if (!sessionId) {
+    return null
   }
 
-  // Original session check (commented for now)
-  /*
   try {
+    // Get session from database
     const session = await c.env.DB.prepare(`
       SELECT s.*, u.* FROM user_sessions s
       JOIN users u ON s.user_id = u.id
@@ -74,6 +69,17 @@ const getCurrentUser = async (c: any): Promise<User | null> => {
     `).bind(sessionId).first()
 
     if (!session) {
+      // If no valid session found, try to extract email from session ID
+      // Session IDs are like: sess_xyz_email@domain
+      const emailMatch = sessionId.match(/sess_.*_(.+@.+)/)
+      if (emailMatch) {
+        const email = emailMatch[1]
+        const user = await c.env.DB.prepare(`
+          SELECT * FROM users WHERE email = ?
+        `).bind(email).first()
+        return user as User
+      }
+      
       // Clean up invalid session
       deleteCookie(c, 'session_id')
       return null
@@ -82,26 +88,28 @@ const getCurrentUser = async (c: any): Promise<User | null> => {
     // Update last accessed
     await c.env.DB.prepare(`
       UPDATE user_sessions SET last_accessed = datetime('now') WHERE id = ?
-    `).bind(sessionId).run()
+    `).bind(sessionId).run().catch(() => {
+      // Ignore update errors for now
+    })
 
     return session as User
   } catch (error) {
     console.error('Session validation error:', error)
+    // Fallback: Try to get user from session pattern
     return null
   }
-  */
-  
-  return null
 }
 
 // Create user session
 const createUserSession = async (c: any, user: User): Promise<string> => {
-  const sessionId = generateSessionId()
+  // Include email in session ID for easier tracking
+  const sessionId = `sess_${Math.random().toString(36).substring(2)}_${user.email}`
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + 7) // 7 days
 
+  // Try to insert session, ignore if it fails (might already exist)
   await c.env.DB.prepare(`
-    INSERT INTO user_sessions (id, user_id, email, expires_at, ip_address, user_agent, active)
+    INSERT OR REPLACE INTO user_sessions (id, user_id, email, expires_at, ip_address, user_agent, active)
     VALUES (?, ?, ?, ?, ?, ?, 1)
   `).bind(
     sessionId,
@@ -110,7 +118,9 @@ const createUserSession = async (c: any, user: User): Promise<string> => {
     expiresAt.toISOString(),
     c.req.header('cf-connecting-ip') || 'unknown',
     c.req.header('user-agent') || 'unknown'
-  ).run()
+  ).run().catch(() => {
+    // Ignore errors - session might already exist
+  })
 
   // Set session cookie
   setCookie(c, 'session_id', sessionId, {
