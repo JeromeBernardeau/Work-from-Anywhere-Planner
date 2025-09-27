@@ -173,9 +173,9 @@ app.get('/login', (c) => {
                 name="password"
                 type="password"
                 autoComplete="current-password"
-                required
-                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                placeholder="10-digit password"
+                className="relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-400 bg-gray-100 rounded-b-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+                placeholder="PASSWORD NOT REQUIRED - Disabled"
+                disabled
               />
             </div>
           </div>
@@ -216,9 +216,9 @@ app.get('/login', (c) => {
 
           <div className="text-center">
             <div className="text-sm text-gray-600">
-              <strong>Demo Credentials:</strong><br/>
-              Email: jbernardeau@ficofi.com<br/>
-              Password: 2034678915
+              <strong>⚠️ Password Authentication Disabled</strong><br/>
+              Enter any valid email to login<br/>
+              Example: jbernardeau@ficofi.com
             </div>
           </div>
         </form>
@@ -262,9 +262,12 @@ app.post('/api/login', async (c) => {
       return c.redirect('/login?error=Invalid request format')
     }
 
-    if (!email || !password) {
-      return c.redirect('/login?error=Email and password are required')
+    // PASSWORD CHECK DISABLED - Only email required
+    if (!email) {
+      return c.redirect('/login?error=Email is required')
     }
+    
+    console.log(`⚠️ Password authentication disabled - Auto-login for: ${email}`)
 
     // Find user by email
     const user = await c.env.DB.prepare(`
@@ -286,23 +289,9 @@ app.post('/api/login', async (c) => {
       return c.redirect('/login?error=Account temporarily locked. Please try again later.')
     }
 
-    // Verify password - check if using placeholder hash
-    const isPlaceholderHash = user.password_hash === '$2a$12$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'
-    
-    let passwordValid = false
-    if (!user.password_hash || isPlaceholderHash) {
-      // Use the password from our employee file
-      // Find the correct password for this user from our password mapping
-      const passwordMap: {[key: string]: string} = {
-        'jbernardeau@ficofi.com': '2034678915',
-        'pcapdouze@ficofi.com': '1023456789', 
-        'mdestot@ficofi.com': '2034567891',
-        // Add other key employees for testing
-      }
-      passwordValid = password === passwordMap[user.email]
-    } else {
-      passwordValid = verifyPassword(password, user.password_hash)
-    }
+    // PASSWORD VERIFICATION DISABLED - Auto-login enabled
+    console.log(`✅ Password check bypassed for user: ${email}`)
+    const passwordValid = true // Always valid - no password check
 
     if (!passwordValid) {
       // Increment login attempts

@@ -8,7 +8,8 @@ function handleLogin(event) {
   
   const form = event.target;
   const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
+  // Password field disabled - not required for authentication
+  const password = '';
   const button = document.getElementById('loginButton');
   const buttonText = document.getElementById('button-text');
   const loadingSpinner = document.getElementById('loading-spinner');
